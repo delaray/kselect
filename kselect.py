@@ -2,16 +2,48 @@
 # Selecting the Best K for Kmeans
 # *********************************************************************************************
 
+# System modules
+import os
+import sys
+import operator
+
+# Math
 import math 
+import random
+import numpy as np
 from numpy import sqrt
 from numpy.random import randint
-import numpy as np
-import random
+from numpy import round, abs
 
-from scipy.spatial import distance
+# Data Frames
 import pandas as pd
-import operator
-        
+
+# ML
+from scipy.spatial import distance
+from sklearn.cluster import KMeans
+from sklearn import mixture
+
+# Pyplot
+import matplotlib.pyplot as plt
+
+# *********************************************************************************************
+# Math Functions
+# *********************************************************************************************
+
+def powers_of_two (maximum, minimum=2):
+    results = [minimum*minimum]
+    power = 2
+    while results[-1] < maximum/2:
+        power += 1
+        results.append (2**power)
+    return results[:-1]
+
+def vector_norm (vector):
+    return sqrt(sum([x**2 for x in vector]))
+
+def vector_diff (v1, v2):
+    return list(map(operator.sub, v1, v2))
+
 # *********************************************************************************************
 # Bayesian Information Criterion Calculation
 # *********************************************************************************************
@@ -53,12 +85,6 @@ def compute_model_variance (clusters_df, centers):
 # ------------------------------------------------------------------------------------------
 # Single Datapoint Density
 # ------------------------------------------------------------------------------------------
-
-def vector_norm (vector):
-    return sqrt(sum([x**2 for x in vector]))
-
-def vector_diff (v1, v2):
-    return list(map(operator.sub, v1, v2))
 
 # ------------------------------------------------------------------------------------------
 
@@ -132,12 +158,12 @@ def scale_points (points):
     return new_points
         
 # *********************************************************************************************
-# Elbow Method For Selecting the Best K for KMeans.
+# Elbow Method For Selecting the Best K.
 # *********************************************************************************************
 
 # Input: Bics is a vector of vectors of the form [k bic].
 
-# Methodology: Find the largest angle less 45 degrees between succes pairs
+# Methodology: Find the largest angle less 45 degrees between successive
 # of points (k, bic)
 
 # Return the boundaries of range of K values.
@@ -176,7 +202,183 @@ def find_max_gap (bics):
     return successive_pairs[0]
 
 #*******************************************************************************************
-# MISCELLANEOUS FUNCTIONS
+# Kmeans Clustering
+#*******************************************************************************************
+
+# ------------------------------------------------------------------------------------------
+
+def initial_centers (df, labels):
+    centers = [list(df.loc[index]) for index in labels]
+    return np.array(centers)
+
+#--------------------------------------------------------------------
+
+def cluster_xy_data_kmeans (df, K=None, words=None):
+    # Determine K if needed.
+    if K==None:
+        K, bics = cluster_xy_data_em (df)
+    df = df.copy()
+    # Convert to numpy array
+    points = df.as_matrix()
+    # A numpy array of shape (points, dimensions)
+    #centers = initial_centers(df, labels)
+    # Run Kmeans. Need to specify n_init to avoid warnings.
+    km = KMeans(n_clusters=K, max_iter=10000).fit(points)
+    df['cluster'] = list(km.labels_)
+    return df, km.cluster_centers_, km
+
+#--------------------------------------------------------------------
+
+def compute_bics_for_k_range(df, kandidates=None):
+    if kandidates==None:
+        kandidates = powers_of_two(df.shape[0])
+    # Generate a model for each k
+    models = []
+    for k in kandidates:
+        ldf, centers, model = cluster_xy_data_kmeans (df, K=k)
+        models.append([k, ldf, centers, model])
+    # Find the best bic range. NB: Bic term has 3 values: bic, density, variance.
+    # Use density value as BIC for now.
+    stats = [[k, BIC(ldf, centers)] for k, ldf, centers, km in models]
+    bics, dens, vars = extract_stats(stats)
+    return bics, dens, vars
+
+#--------------------------------------------------------------------
+
+def find_best_k_range (df, kandidates=None, iterations=1000):
+    if kandidates==None:
+        kandidates = powers_of_two(df.shape[0])
+    print ("Running K-Means " + str(len(kandidates)) + " times...")
+    bics, dens, variance = compute_bics_for_k_range(df, kandidates)
+    best_range = find_elbow (bics)
+    return best_range
+
+#--------------------------------------------------------------------
+ 
+# Bayesian Based K Selector with logarithmic time search
+
+def binsearch_bic_k (df, k_range, iterations=1000):
+    r1, r2 = k_range
+    k1, b1 = r1
+    k2, b2 = r2
+    print ("Running Kmeans " + str(int(np.log(k2 - k1))) + " times....")
+                                       
+    while True:
+        if k2 <= k1:
+            return [k1, b1]
+        elif k2-k1==1:
+            if b1<b2:
+                return [k1, b1]
+            else:
+                return [k2, b2]
+        else:
+            mid_k = k1 + int(round((k2 - k1) / 2.0))
+            print ("Next K:  " + str(mid_k))
+            ldf, centers, km = cluster_xy_data_kmeans (df, K=mid_k)
+            # Use density as BIC for now.
+            bic = BIC(ldf, centers)
+            mid_b = bic[2]
+            if abs(b1 - mid_b) > abs(mid_b - b2):
+                k1, b1 = mid_k, mid_b
+            else:
+                k2, b2 = mid_k, mid_b
+
+#--------------------------------------------------------------------
+# FIND BEST K
+#--------------------------------------------------------------------
+
+def find_best_k (df, kandidates=None, iterations=100):
+    print ("Finding best K range...")
+    k_range = find_best_k_range(df, kandidates=kandidates,iterations=iterations)
+    print ("Best K Range: " + str(k_range))
+
+    print ("Performing binary search on K range...")
+    k, b = binsearch_bic_k(df, k_range, iterations=iterations)
+    print ("Best K value is " + str(k))
+           
+    return k
+
+    
+#--------------------------------------------------------------------
+
+def run_kmeans(df, K=None, iterations=1000):
+    if K == None:
+        K = find_best_k (df,  iterations=iterations)
+    ldf, centers, km = cluster_xy_data_kmeans (df, K=K)
+    return ldf, centers, K
+
+
+#*******************************************************************************************
+# Graphical Plots
+#*******************************************************************************************
+
+#-------------------------------------------------------------------------------------------
+# Plot Clusters
+#-------------------------------------------------------------------------------------------
+
+def show_styles():
+    print (plt.style.available)
+
+#-------------------------------------------------------------------------------------------
+
+def set_axis_boundaries (df):
+    xmin = min(df['x'])
+    xmax = max(df['x']) + 5
+    ymin = min(df['y'])
+    ymax = max(df['y']) + 5
+    plt.xlim(xmin, xmax)
+    plt.ylim(ymin, ymax)
+
+    
+#-------------------------------------------------------------------------------------------
+
+
+def plot_clusters (df, centers, title="Clusters"):
+
+    area = 4
+    colors = df['cluster']
+    fig = plt.figure()
+
+    plot = fig.add_subplot(1, 1, 1)
+    
+    plot.scatter(df['x'], df['y'], s=area, c=colors)
+
+    # Set the axes boudaries
+    set_axis_boundaries(df)
+    plt.style.use('seaborn-pastel')
+    plt.title(title)
+     
+    x_centers = [p[0] for p in centers]
+    y_centers = [p[1] for p in centers]
+    plot.scatter(x_centers, y_centers, s=100, c=list(range(len(centers))))
+
+    # Add cluster circles
+    add_circles(fig, centers, df)
+    
+    # for  pos in centers:
+    #     # word = cda.find_closest_word_to_point(df, pos)[0]
+    #     words = cda.find_relevant_words_near_point(df, pos)
+    #     index = list(df.index)
+    #     for word in words:
+    #         if word in index:
+    #             print ("Word: " + word)
+    #             pos = df.loc[word][['x', 'y']]
+    #             plot.annotate(word, pos)
+
+    plt.show()
+
+#-------------------------------------------------------------------------------------------
+
+# Select a k, run kmeans, plot clusters.
+
+def plot_kmeans (df, K=None):
+    ldf, centers, K = cdc.run_kmeans(df, K=K)
+    title = ("Kmeans Clusters for K = " + str(K))
+    plot_clusters(ldf, centers, title=title)
+    return K, ldf, centers
+
+#*******************************************************************************************
+# Random Data Tests
 #*******************************************************************************************
 
 # ------------------------------------------------------------------------------------------
@@ -205,14 +407,9 @@ def generate_random_grid (K, size, min=0, max=1000, margin=5):
 
 # ------------------------------------------------------------------------------------------
 
-def powers_of_two (maximum, minimum=2):
-    results = [minimum*minimum]
-    power = 2
-    while results[-1] < maximum/2:
-        power += 1
-        results.append (2**power)
-    return results[:-1]
-
+def test_kselect (K, size, display=True):
+    return None
+    
 #*******************************************************************************************
 # End
 #*******************************************************************************************
