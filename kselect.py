@@ -205,11 +205,22 @@ def find_max_gap (bics):
 # Kmeans Clustering
 #*******************************************************************************************
 
-# ------------------------------------------------------------------------------------------
-
 def initial_centers (df, labels):
     centers = [list(df.loc[index]) for index in labels]
     return np.array(centers)
+
+
+#--------------------------------------------------------------------
+
+def compute_cluster_radius (cluster_df, cluster, center):
+    members = cluster_df.loc[cluster_df['cluster'] == cluster]
+    max_dist = 0
+    for index, member in members.iterrows():
+        point = (member['x'], member['y'])
+        dist = distance.euclidean(center, point)
+        if dist > max_dist:
+            max_dist = dist
+    return max_dist
 
 #--------------------------------------------------------------------
 
@@ -312,6 +323,14 @@ def run_kmeans(df, K=None, iterations=1000):
 # Graphical Plots
 #*******************************************************************************************
 
+def add_circles (fig, centers, df):
+    ax = fig.gca()
+    for i, center in enumerate(centers):
+        radius = compute_cluster_radius(df, i, center)
+        circle = plt.Circle(center, radius, fill=False)
+        #circle = plt.Circle(center, radius, color=i+1)
+        ax.add_artist(circle)
+
 #-------------------------------------------------------------------------------------------
 # Plot Clusters
 #-------------------------------------------------------------------------------------------
@@ -372,7 +391,7 @@ def plot_clusters (df, centers, title="Clusters"):
 # Select a k, run kmeans, plot clusters.
 
 def plot_kmeans (df, K=None):
-    ldf, centers, K = cdc.run_kmeans(df, K=K)
+    ldf, centers, K = run_kmeans(df, K=K)
     title = ("Kmeans Clusters for K = " + str(K))
     plot_clusters(ldf, centers, title=title)
     return K, ldf, centers
@@ -385,7 +404,7 @@ def plot_kmeans (df, K=None):
 # Generates a grid of random real numbers.
 # ------------------------------------------------------------------------------------------
 
-def generate_random_grid (K, size, min=0, max=1000, margin=5):
+def generate_random_grid (K, size, min=0, max=1000, margin=10):
     random.seed()
     N = int(sqrt(K))
     points = []
@@ -407,8 +426,18 @@ def generate_random_grid (K, size, min=0, max=1000, margin=5):
 
 # ------------------------------------------------------------------------------------------
 
-def test_kselect (K, size, display=True):
-    return None
+def test_kmeans (K, data_size, margin=50):
+    df = generate_random_grid(K, data_size, margin=margin)
+    plot_kmeans(df, K)
+    return True
+
+# ------------------------------------------------------------------------------------------
+
+def test_kselect (K, data_size, margin=50):
+    df = generate_random_grid(K, data_size, margin=margin)
+    predicted_K = find_best_k (df)
+    plot_kmeans(df, predicted_K)
+    return True
     
 #*******************************************************************************************
 # End
