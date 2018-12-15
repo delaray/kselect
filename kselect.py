@@ -404,7 +404,7 @@ def plot_kmeans (df, K=None):
 # Generates a grid of random real numbers.
 # ------------------------------------------------------------------------------------------
 
-def generate_random_grid (K, size, min=0, max=1000, margin=10):
+def generate_random_grid (K, size, min=0, max=1000, margin=50):
     random.seed()
     N = int(sqrt(K))
     points = []
@@ -433,12 +433,26 @@ def test_kmeans (K, data_size, margin=50):
 
 # ------------------------------------------------------------------------------------------
 
-def test_kselect (K, data_size, margin=50):
+def test_kselect (K, data_size, margin=50, plot=False):
     df = generate_random_grid(K, data_size, margin=margin)
     predicted_K = find_best_k (df)
     plot_kmeans(df, predicted_K)
     return True
-    
+
+# ------------------------------------------------------------------------------------------
+
+def evaluate_kselect (number_of_ks=5, margin=50):
+    K_range = map(lambda x: x*x, range(2, number_of_ks+2))
+    data_sizes = [1000, 2000, 3000, 4000]
+    results = []
+    for K in K_range:
+        for data_size in data_sizes:
+            df = generate_random_grid(K, data_size, margin=margin)
+            predicted_K = find_best_k (df)
+            results.append([data_size, margin,K, predicted_K, K-predicted_K])
+    columns = ['data_size', 'margin', 'correct_k', 'predicted_k', 'error']
+    return(pd.DataFrame(results, columns=columns))
+                
 #*******************************************************************************************
 # End
 #*******************************************************************************************
