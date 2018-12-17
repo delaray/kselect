@@ -41,4 +41,6 @@ Because the BIC is based on cluster density, there is a some variation in the va
 
 ## Examples
 
-![alt text](https://github.com/delaray/kselect/tree/master/img/kselect-25.PNG)
+![alt text][example1]
+
+[example1]: https://github.com/delaray/kselect/tree/master/img/kselect-25.PNG
