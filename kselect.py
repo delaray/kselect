@@ -449,7 +449,7 @@ def evaluate_kselect (number_of_ks=5, margin=50):
         for data_size in data_sizes:
             df = generate_random_grid(K, data_size, margin=margin)
             predicted_K = find_best_k (df)
-            results.append([data_size, margin,K, predicted_K, K-predicted_K])
+            results.append([data_size, margin,K, predicted_K, abs(K-predicted_K)])
     columns = ['data_size', 'margin', 'correct_k', 'predicted_k', 'error']
     return(pd.DataFrame(results, columns=columns))
                 
