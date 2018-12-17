@@ -16,7 +16,8 @@ Because the BIC is based on cluster density, there is a some variation in the va
 
 
 | correct_k |  data_size |  margin |  predicted_k |  error |
-|         4 |       1000 |      50 |            12 |     -8 |
+| --------: | ----------:| -------:| ------------:| ------:|
+|         4 |       1000 |      50 |           12 |     -8 |
 |         4 |       2000 |      50 |           14 |    -10 |
 |         4 |       3000 |      50 |           27 |    -23 |
 |         4 |       4000 |      50 |           25 |    -21 |
