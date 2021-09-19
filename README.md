@@ -2,7 +2,7 @@
 
 ## Overview
 
-This module implements an algorithm for determiming a near optimal K for use with the K-Means clustering algorithm. It applies the welknow Elbow Method along with the Bayesian Information Criteria (BIC)
+This module implements an algorithm for determiming a near optimal K for use with the K-Means clustering algorithm. It applies the well known Elbow Method along with the Bayesian Information Criteria (BIC).
 
 ## Installation
 

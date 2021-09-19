@@ -1,6 +1,6 @@
-# *********************************************************************************************
+# *****************************************************************************************
 # Selecting the Best K for Kmeans
-# *********************************************************************************************
+# *****************************************************************************************
 
 # System modules
 import os
@@ -8,11 +8,9 @@ import sys
 import operator
 
 # Math
-import math 
 import random
 import numpy as np
 from numpy import sqrt
-from numpy.random import randint
 from numpy import round, abs
 
 # Data Frames
@@ -26,33 +24,41 @@ from sklearn import mixture
 # Pyplot
 import matplotlib.pyplot as plt
 
-# *********************************************************************************************
-# Math Functions
-# *********************************************************************************************
 
-def powers_of_two (maximum, minimum=2):
+# ****************************************************************************************
+# Math Functions
+# ****************************************************************************************
+
+def powers_of_two(maximum, minimum=2):
     results = [minimum*minimum]
     power = 2
     while results[-1] < maximum/2:
         power += 1
-        results.append (2**power)
+        results.append(2**power)
     return results[:-1]
+
+
+# ------------------------------------------------------------------------------------------
 
 def vector_norm (vector):
     return sqrt(sum([x**2 for x in vector]))
 
-def vector_diff (v1, v2):
+
+# ------------------------------------------------------------------------------------------
+
+def vector_diff(v1, v2):
     return list(map(operator.sub, v1, v2))
 
-# *********************************************************************************************
+
+# ****************************************************************************************
 # Bayesian Information Criterion Calculation
-# *********************************************************************************************
+# ****************************************************************************************
 
 # ------------------------------------------------------------------------------------------
 # Compute Cluster Variance
 # ------------------------------------------------------------------------------------------
 
-def compute_cluster_variance (cluster_df, center, k):
+def compute_cluster_variance(cluster_df, center, k):
     cluster_size = cluster_df.shape[0]
     # print ("Cluster Size: " + str(cluster_size) + " ,K: " + str(k))
     squared_distances = []
@@ -70,7 +76,7 @@ def compute_cluster_variance (cluster_df, center, k):
 # This computes the sum of the squares of distances of each point from the center of
 # it's cluster divided by the total number of points.
 
-def compute_model_variance (clusters_df, centers):
+def compute_model_variance(clusters_df, centers):
     k = len(centers)
     N = clusters_df.shape[0]
     variances = []
@@ -79,38 +85,37 @@ def compute_model_variance (clusters_df, centers):
         cluster_df = clusters_df.loc[clusters_df['cluster'] == cluster_label]
         center = centers[cluster_label]
         variances.append(compute_cluster_variance(cluster_df, center, k))
-    return sum(variances) 
+    return sum(variances)
     #return sum(variances) / N
+
 
 # ------------------------------------------------------------------------------------------
 # Single Datapoint Density
 # ------------------------------------------------------------------------------------------
 
-# ------------------------------------------------------------------------------------------
+# This computes P(uj | M, sigma2) where uj is a datapoint, M contains all
+# the means (i.e. cluster centers) and sigma squared is the overall variance.
 
-# This computes P(uj | M, sigma2) where uj is a datapoint, M contains all the means
-# (i.e. cluster centers) and sigma squared is the overall variance.
-
-def data_point_density (point, center, variance):
-    mfactor = 1.0 / (sqrt (2 * np.pi * variance)) if variance != 0 else 0
+def data_point_density(point, center, variance):
+    mfactor = 1.0 / (sqrt(2 * np.pi * variance)) if variance != 0 else 0
     uj = point
     ukj = center
-    norm = vector_norm(vector_diff (uj, ukj))
+    norm = vector_norm(vector_diff(uj, ukj))
     exponent = - 0.5 * (norm**2 / variance) if variance != 0 else 0
     density = mfactor * (np.e ** exponent)
     return density
 
-# -------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 # Data Set Density
-# -------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 
-def data_model_density (cluster_df, centers):
+def data_model_density(cluster_df, centers):
 
-    # Number of datapoints in the cluster 
+    # Number of datapoints in the cluster
     N = cluster_df.shape[0]
-    
-    # Compute the variance of the model 
-    variance = compute_model_variance (cluster_df, centers)
+
+    # Compute the variance of the model
+    variance = compute_model_variance(cluster_df, centers)
 
     # Sum the log of the individual densities of the data points.
     result = 0
@@ -123,21 +128,23 @@ def data_model_density (cluster_df, centers):
 
     return result, variance
 
-# -------------------------------------------------------------------------------------------------
-# Bayesian Information Criteria
-# -------------------------------------------------------------------------------------------------
 
-def BIC (cluster_df, centers):
+# ---------------------------------------------------------------------------------------
+# Bayesian Information Criteria
+# ---------------------------------------------------------------------------------------
+
+def BIC(cluster_df, centers):
     k = len(centers)
-    Q = len(centers[0])
+    # Q = len(centers[0])
     N = cluster_df.shape[0]
     density, variance = data_model_density(cluster_df, centers)
-    k_factor = k  * np.log(N)
-    bic = density - ((((k+1) * Q) / 2) * np.log(N))
-    return bic, density, variance
-    #return  k_factor - (2 * density) , density, variance
+    k_factor = k * np.log(N)
+    # bic = density - ((((k+1) * Q) / 2) * np.log(N))
+    # return bic, density, variance
+    return k_factor - (2 * density), density, variance
 
-# -------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------
 
 def extract_stats(stats):
     bics = [[x[0], x[1][0]] for x in stats]
@@ -145,21 +152,22 @@ def extract_stats(stats):
     variances = [[x[0], x[1][2]] for x in stats]
     return bics, densities, variances
 
-# -------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 # Find Maximim Gap in BICs
-# -------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 
-def scale_points (points):
+def scale_points(points):
     min_x = np.min([p[0] for p in points])
     max_x = np.max([p[0] for p in points])
     min_y = np.min([p[1] for p in points])
     max_y = np.max([p[1] for p in points])
     new_points = [[x, (x-min_x)/(max_x-min_x), (y-min_y)/(max_y-min_y)] for x,y in points]
     return new_points
-        
-# *********************************************************************************************
+
+
+# **************************************************************************************
 # Elbow Method For Selecting the Best K.
-# *********************************************************************************************
+# **************************************************************************************
 
 # Input: Bics is a vector of vectors of the form [k bic].
 
@@ -168,11 +176,15 @@ def scale_points (points):
 
 # Return the boundaries of range of K values.
 
-def find_elbow (bics):
+def find_elbow(bics):
     bic_dict = dict(bics)
     bics = scale_points(bics)
     pairs = [[e1, e2] for e1, e2 in zip(bics[:-1],bics[1:])]
-    slopes = [[p[0], p[1], np.abs(p[1][2]-p[0][2]) / np.abs(p[1][1]-p[0][1])] for p in pairs]
+    plot_bics(pairs)
+    ratios =  [np.abs(p[1][2]-p[0][2]) / np.abs(p[1][1]-p[0][1]) for p in pairs]
+    print ('Ratios: ' + str(ratios))
+    slopes = list(map(lambda p,r: [p[0], p[1], r], pairs, ratios))
+    print ('Slopes: ' + str(slopes))
     angles = [[p1 , p2, np.degrees(np.arctan(slope))] for p1, p2, slope in slopes]
     found = angles[0]
     for angle in angles:
@@ -185,14 +197,14 @@ def find_elbow (bics):
             b2 = bic_dict[k2]
             return [[k1, b1], [k2, b2]]
 
-# -------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 
 # This chooses largest gap in BICs.
 
 # Input: Bics is a vector of vectors of the form [k bic].
 # Output: A vector of [k1 b1] [k2 b2] and (- b2 b1).
 
-def find_max_gap (bics):
+def find_max_gap(bics):
     bics = scale_points(bics)
     successive_pairs = [[e1, e2] for e1, e2 in zip(bics[:-1],bics[1:])]
     sort_key = lambda x : np.abs(x[1][2] - x[0][2])
@@ -201,18 +213,18 @@ def find_max_gap (bics):
     print (successive_pairs)
     return successive_pairs[0]
 
-#*******************************************************************************************
+#************************************************************************************
 # Kmeans Clustering
-#*******************************************************************************************
+#************************************************************************************
 
-def initial_centers (df, labels):
+def initial_centers(df, labels):
     centers = [list(df.loc[index]) for index in labels]
     return np.array(centers)
 
 
 #--------------------------------------------------------------------
 
-def compute_cluster_radius (cluster_df, cluster, center):
+def compute_cluster_radius(cluster_df, cluster, center):
     members = cluster_df.loc[cluster_df['cluster'] == cluster]
     max_dist = 0
     for index, member in members.iterrows():
@@ -224,10 +236,10 @@ def compute_cluster_radius (cluster_df, cluster, center):
 
 #--------------------------------------------------------------------
 
-def cluster_xy_data_kmeans (df, K=None, words=None):
+def cluster_xy_data_kmeans(df, K=None, words=None):
     # Determine K if needed.
     if K==None:
-        K, bics = cluster_xy_data_em (df)
+        K, bics = cluster_xy_data_em(df)
     df = df.copy()
     # Convert to numpy array
     points = df.as_matrix()
@@ -237,6 +249,7 @@ def cluster_xy_data_kmeans (df, K=None, words=None):
     km = KMeans(n_clusters=K, max_iter=10000).fit(points)
     df['cluster'] = list(km.labels_)
     return df, km.cluster_centers_, km
+
 
 #--------------------------------------------------------------------
 
@@ -254,21 +267,24 @@ def compute_bics_for_k_range(df, kandidates=None):
     bics, dens, vars = extract_stats(stats)
     return bics, dens, vars
 
+
 #--------------------------------------------------------------------
 
-def find_best_k_range (df, kandidates=None, iterations=1000):
-    if kandidates==None:
+def find_best_k_range(df, kandidates=None, iterations=1000):
+    # kandidates = [(i * 5) + 1 for i in range(20)]
+    if kandidates == None:
         kandidates = powers_of_two(df.shape[0])
     print ("Running K-Means " + str(len(kandidates)) + " times...")
     bics, dens, variance = compute_bics_for_k_range(df, kandidates)
-    best_range = find_elbow (bics)
+    best_range = find_elbow(bics)
     return best_range
+
 
 #--------------------------------------------------------------------
  
 # Bayesian Based K Selector with logarithmic time search
 
-def binsearch_bic_k (df, k_range, iterations=1000):
+def binsearch_bic_k(df, k_range, iterations=1000):
     r1, r2 = k_range
     k1, b1 = r1
     k2, b2 = r2
@@ -277,15 +293,15 @@ def binsearch_bic_k (df, k_range, iterations=1000):
     while True:
         if k2 <= k1:
             return [k1, b1]
-        elif k2-k1==1:
-            if b1<b2:
+        elif k2-k1 == 1:
+            if b1 < b2:
                 return [k1, b1]
             else:
                 return [k2, b2]
         else:
             mid_k = k1 + int(round((k2 - k1) / 2.0))
             print ("Next K:  " + str(mid_k))
-            ldf, centers, km = cluster_xy_data_kmeans (df, K=mid_k)
+            ldf, centers, km = cluster_xy_data_kmeans(df, K=mid_k)
             # Use density as BIC for now.
             bic = BIC(ldf, centers)
             mid_b = bic[2]
@@ -294,53 +310,96 @@ def binsearch_bic_k (df, k_range, iterations=1000):
             else:
                 k2, b2 = mid_k, mid_b
 
+
 #--------------------------------------------------------------------
 # FIND BEST K
 #--------------------------------------------------------------------
 
-def find_best_k (df, kandidates=None, iterations=100):
+def find_best_k(df, kandidates=None, iterations=100):
     print ("Finding best K range...")
-    k_range = find_best_k_range(df, kandidates=kandidates,iterations=iterations)
-    print ("Best K Range: " + str(k_range))
+    k_range = find_best_k_range(df, kandidates=kandidates, iterations=iterations)
+    print("Best K Range: " + str(k_range))
 
-    print ("Performing binary search on K range...")
+    print("Performing binary search on K range...")
     k, b = binsearch_bic_k(df, k_range, iterations=iterations)
-    print ("Best K value is " + str(k))
-           
+    print("Best K value is " + str(k))
+
     return k
 
-    
+
 #--------------------------------------------------------------------
 
 def run_kmeans(df, K=None, iterations=1000):
     if K == None:
-        K = find_best_k (df,  iterations=iterations)
-    ldf, centers, km = cluster_xy_data_kmeans (df, K=K)
+        K = find_best_k(df,  iterations=iterations)
+    ldf, centers, km = cluster_xy_data_kmeans(df, K=K)
     return ldf, centers, K
 
 
-#*******************************************************************************************
+#****************************************************************************************
 # Graphical Plots
-#*******************************************************************************************
+#****************************************************************************************
 
-def add_circles (fig, centers, df):
+#-------------------------------------------------------------------------------------------
+# Plot Bics
+#-------------------------------------------------------------------------------------------
+
+def plot_sin():
+    
+    X = [x*10 for x in range(37)]
+    Y = [np.sin(np.radians(a)) for a in X]
+
+    # Plot the BIC scores
+    plt.plot(X,Y)
+    plt.xticks(X)
+    plt.title('Basic Sine Wave')
+    plt.xlabel('Angle in radians')
+    plt.ylabel('Sine')
+
+    plt.show()
+
+#-------------------------------------------------------------------------------------------
+# Plot Bics
+#-------------------------------------------------------------------------------------------
+
+def plot_bics(bics):
+    
+    Y = [b[1] for b in bics]
+    X = [b[0] for b in bics]
+
+    print (X)
+    print (Y)
+ 
+    # Plot the BIC scores
+    plt.plot(X,Y)
+    #plt.xticks(X)
+    plt.title('Bayesian Information Criterion')
+    plt.xlabel('Number of components (clusters)')
+    plt.ylabel('Information Gain (BIC)')
+
+    plt.show()
+
+
+def add_circles(fig, centers, df):
     ax = fig.gca()
     for i, center in enumerate(centers):
         radius = compute_cluster_radius(df, i, center)
         circle = plt.Circle(center, radius, fill=False)
-        #circle = plt.Circle(center, radius, color=i+1)
+        # circle = plt.Circle(center, radius, color=i+1)
         ax.add_artist(circle)
+
 
 #-------------------------------------------------------------------------------------------
 # Plot Clusters
 #-------------------------------------------------------------------------------------------
 
 def show_styles():
-    print (plt.style.available)
+    print(plt.style.available)
+
 
 #-------------------------------------------------------------------------------------------
 
-def set_axis_boundaries (df):
+def set_axis_boundaries(df):
     xmin = min(df['x'])
     xmax = max(df['x']) + 5
     ymin = min(df['y'])
@@ -348,11 +407,11 @@ def set_axis_boundaries (df):
     plt.xlim(xmin, xmax)
     plt.ylim(ymin, ymax)
 
-    
+
 #-------------------------------------------------------------------------------------------
 
 
-def plot_clusters (df, centers, title="Clusters"):
+def plot_clusters(df, centers, title="Clusters"):
 
     area = 4
     colors = df['cluster']
@@ -388,23 +447,25 @@ def plot_clusters (df, centers, title="Clusters"):
 
 #-------------------------------------------------------------------------------------------
 
-# Select a k, run kmeans, plot clusters.
 
-def plot_kmeans (df, K=None):
+# Select k, run kmeans, plot clusters.
+
+def plot_kmeans(df, K=None):
     ldf, centers, K = run_kmeans(df, K=K)
     title = ("Kmeans Clusters for K = " + str(K))
     plot_clusters(ldf, centers, title=title)
     return K, ldf, centers
 
-#*******************************************************************************************
-# Random Data Tests
-#*******************************************************************************************
 
-# ------------------------------------------------------------------------------------------
+# ***************************************************************************
+# Random Data Sets
+# ***************************************************************************
+
+# ---------------------------------------------------------------------------
 # Generates a grid of random real numbers.
-# ------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
-def generate_random_grid (K, size, min=0, max=1000, margin=50):
+def generate_random_grid(K, size, min=0, max=1000, margin=50):
     random.seed()
     N = int(sqrt(K))
     points = []
@@ -424,35 +485,46 @@ def generate_random_grid (K, size, min=0, max=1000, margin=50):
     df = pd.DataFrame(points, columns=['x', 'y'])
     return df
 
-# ------------------------------------------------------------------------------------------
+# *****************************************************************************
+# Testing Functions
+# *****************************************************************************
 
-def test_kmeans (K, data_size, margin=50):
+
+def test_kmeans(K, data_size, margin=50):
     df = generate_random_grid(K, data_size, margin=margin)
     plot_kmeans(df, K)
     return True
 
-# ------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
-def test_kselect (K, data_size, margin=50, plot=False):
+
+def test_kselect(K, data_size, margin=50, plot=False):
     df = generate_random_grid(K, data_size, margin=margin)
-    predicted_K = find_best_k (df)
-    plot_kmeans(df, predicted_K)
-    return True
+    predicted_K = find_best_k(df)
+    if plot is True:
+        plot_kmeans(df, predicted_K)
+    return predicted_K
 
-# ------------------------------------------------------------------------------------------
 
-def evaluate_kselect (number_of_ks=5, margin=50):
+# ------------------------------------------------------------------------------
+
+def evaluate_kselect(number_of_ks=5, margin=50):
     K_range = map(lambda x: x*x, range(2, number_of_ks+2))
-    data_sizes = [1000, 2000, 3000, 4000]
+    # data_sizes = [1000, 2000, 3000, 4000]
+    data_sizes = [1000]
     results = []
     for K in K_range:
+        print("--------------------------------------")
+        print ("Finding best K for K=" + str(K) + "...")
         for data_size in data_sizes:
             df = generate_random_grid(K, data_size, margin=margin)
-            predicted_K = find_best_k (df)
-            results.append([data_size, margin,K, predicted_K, abs(K-predicted_K)])
+            predicted_K = find_best_k(df)
+            results.append([data_size, margin, K, predicted_K,
+                            abs(K-predicted_K)])
     columns = ['data_size', 'margin', 'correct_k', 'predicted_k', 'error']
-    return(pd.DataFrame(results, columns=columns))
-                
-#*******************************************************************************************
+    return pd.DataFrame(results, columns=columns)
+
+
+# ********************************************************************************
 # End
-#*******************************************************************************************
+# ********************************************************************************
