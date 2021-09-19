@@ -184,7 +184,7 @@ def find_elbow(bics):
     ratios =  [np.abs(p[1][2]-p[0][2]) / np.abs(p[1][1]-p[0][1]) for p in pairs]
     print ('Ratios: ' + str(ratios))
     slopes = list(map(lambda p,r: [p[0], p[1], r], pairs, ratios))
-    print ('Slopes: ' + str(slopes))
+    print('Slopes: ' + str(slopes))
     angles = [[p1 , p2, np.degrees(np.arctan(slope))] for p1, p2, slope in slopes]
     found = angles[0]
     for angle in angles:
@@ -206,16 +206,16 @@ def find_elbow(bics):
 
 def find_max_gap(bics):
     bics = scale_points(bics)
-    successive_pairs = [[e1, e2] for e1, e2 in zip(bics[:-1],bics[1:])]
-    sort_key = lambda x : np.abs(x[1][2] - x[0][2])
+    successive_pairs = [[e1, e2] for e1, e2 in zip(bics[:-1], bics[1:])]
+    def sort_key(x): return lambda x: np.abs(x[1][2] - x[0][2])
     successive_pairs.sort(key=sort_key)
     successive_pairs = successive_pairs[::-1]
-    print (successive_pairs)
+    print(successive_pairs)
     return successive_pairs[0]
 
-#************************************************************************************
+# ****************************************************************************
 # Kmeans Clustering
-#************************************************************************************
+# ****************************************************************************
 
 def initial_centers(df, labels):
     centers = [list(df.loc[index]) for index in labels]
@@ -234,32 +234,33 @@ def compute_cluster_radius(cluster_df, cluster, center):
             max_dist = dist
     return max_dist
 
-#--------------------------------------------------------------------
 
-def cluster_xy_data_kmeans(df, K=None, words=None):
+# --------------------------------------------------------------------
+
+def cluster_xy_data_kmeans(df, K, words=None):
     # Determine K if needed.
-    if K==None:
-        K, bics = cluster_xy_data_em(df)
+    # if K==None:
+    #     K, bics = cluster_xy_data_em(df)
     df = df.copy()
     # Convert to numpy array
-    points = df.as_matrix()
+    points = df.to_numpy()
     # A numpy array of shape (points, dimensions)
-    #centers = initial_centers(df, labels)
+    # centers = initial_centers(df, labels)
     # Run Kmeans. Need to specify n_init to avoid warnings.
     km = KMeans(n_clusters=K, max_iter=10000).fit(points)
     df['cluster'] = list(km.labels_)
     return df, km.cluster_centers_, km
 
 
-#--------------------------------------------------------------------
+# --------------------------------------------------------------------
 
 def compute_bics_for_k_range(df, kandidates=None):
-    if kandidates==None:
+    if kandidates is None:
         kandidates = powers_of_two(df.shape[0])
     # Generate a model for each k
     models = []
     for k in kandidates:
-        ldf, centers, model = cluster_xy_data_kmeans (df, K=k)
+        ldf, centers, model = cluster_xy_data_kmeans(df, K=k)
         models.append([k, ldf, centers, model])
     # Find the best bic range. NB: Bic term has 3 values: bic, density, variance.
     # Use density value as BIC for now.
@@ -268,27 +269,27 @@ def compute_bics_for_k_range(df, kandidates=None):
     return bics, dens, vars
 
 
-#--------------------------------------------------------------------
+# --------------------------------------------------------------------
 
 def find_best_k_range(df, kandidates=None, iterations=1000):
     # kandidates = [(i * 5) + 1 for i in range(20)]
-    if kandidates == None:
+    if kandidates is None:
         kandidates = powers_of_two(df.shape[0])
-    print ("Running K-Means " + str(len(kandidates)) + " times...")
+    print("Running K-Means " + str(len(kandidates)) + " times...")
     bics, dens, variance = compute_bics_for_k_range(df, kandidates)
     best_range = find_elbow(bics)
     return best_range
 
 
-#--------------------------------------------------------------------
- 
+# --------------------------------------------------------------------
+
 # Bayesian Based K Selector with logarithmic time search
 
 def binsearch_bic_k(df, k_range, iterations=1000):
     r1, r2 = k_range
     k1, b1 = r1
     k2, b2 = r2
-    print ("Running Kmeans " + str(int(np.log(k2 - k1))) + " times....")
+    print("Running Kmeans " + str(int(np.log(k2 - k1))) + " times....")
                                        
     while True:
         if k2 <= k1:
@@ -300,7 +301,7 @@ def binsearch_bic_k(df, k_range, iterations=1000):
                 return [k2, b2]
         else:
             mid_k = k1 + int(round((k2 - k1) / 2.0))
-            print ("Next K:  " + str(mid_k))
+            print("Next K:  " + str(mid_k))
             ldf, centers, km = cluster_xy_data_kmeans(df, K=mid_k)
             # Use density as BIC for now.
             bic = BIC(ldf, centers)
@@ -311,13 +312,14 @@ def binsearch_bic_k(df, k_range, iterations=1000):
                 k2, b2 = mid_k, mid_b
 
 
-#--------------------------------------------------------------------
+# --------------------------------------------------------------------
 # FIND BEST K
-#--------------------------------------------------------------------
+# --------------------------------------------------------------------
 
 def find_best_k(df, kandidates=None, iterations=100):
-    print ("Finding best K range...")
-    k_range = find_best_k_range(df, kandidates=kandidates, iterations=iterations)
+    print("Finding best K range...")
+    k_range = find_best_k_range(df, kandidates=kandidates,
+                                iterations=iterations)
     print("Best K Range: " + str(k_range))
 
     print("Performing binary search on K range...")
@@ -330,27 +332,27 @@ def find_best_k(df, kandidates=None, iterations=100):
 #--------------------------------------------------------------------
 
 def run_kmeans(df, K=None, iterations=1000):
-    if K == None:
+    if K is None:
         K = find_best_k(df,  iterations=iterations)
     ldf, centers, km = cluster_xy_data_kmeans(df, K=K)
     return ldf, centers, K
 
 
-#****************************************************************************************
+# *****************************************************************************
 # Graphical Plots
-#****************************************************************************************
+# *****************************************************************************
 
-#-------------------------------------------------------------------------------------------
-# Plot Bics
-#-------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Plot Basic Sinus Wave
+# -------------------------------------------------------------------------------
 
 def plot_sin():
-    
+
     X = [x*10 for x in range(37)]
     Y = [np.sin(np.radians(a)) for a in X]
 
     # Plot the BIC scores
-    plt.plot(X,Y)
+    plt.plot(X, Y)
     plt.xticks(X)
     plt.title('Basic Sine Wave')
     plt.xlabel('Angle in radians')
@@ -358,21 +360,22 @@ def plot_sin():
 
     plt.show()
 
-#-------------------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
 # Plot Bics
-#-------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 
 def plot_bics(bics):
-    
+
     Y = [b[1] for b in bics]
     X = [b[0] for b in bics]
 
-    print (X)
-    print (Y)
- 
+    print(X)
+    print(Y)
+
     # Plot the BIC scores
-    plt.plot(X,Y)
-    #plt.xticks(X)
+    plt.plot(X, Y)
+    # plt.xticks(X)
     plt.title('Bayesian Information Criterion')
     plt.xlabel('Number of components (clusters)')
     plt.ylabel('Information Gain (BIC)')
@@ -389,15 +392,15 @@ def add_circles(fig, centers, df):
         ax.add_artist(circle)
 
 
-#-------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 # Plot Clusters
-#-------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 
 def show_styles():
     print(plt.style.available)
 
 
-#-------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
 
 def set_axis_boundaries(df):
     xmin = min(df['x'])
@@ -408,7 +411,7 @@ def set_axis_boundaries(df):
     plt.ylim(ymin, ymax)
 
 
-#-------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
 
 
 def plot_clusters(df, centers, title="Clusters"):
@@ -445,12 +448,12 @@ def plot_clusters(df, centers, title="Clusters"):
 
     plt.show()
 
-#-------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 
 
 # Select k, run kmeans, plot clusters.
 
-def plot_kmeans(df, K=None):
+def plot_kmeans(df, K):
     ldf, centers, K = run_kmeans(df, K=K)
     title = ("Kmeans Clusters for K = " + str(K))
     plot_clusters(ldf, centers, title=title)
